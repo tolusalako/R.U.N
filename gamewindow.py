@@ -24,7 +24,7 @@ def find_objects_as_objects(img, objects, threshold = .6, all_ = True): #Multipl
 			name = obj.split('/')[-1]
 			found_objects.add(Object(name, pt, (w,h))) #Can use the first loc value or the avg of them. It is usually accurate
 			break
-		if not all_ and len(found_objects) > 1:
+		if ((not all_) and (len(found_objects) > 1)):
 			break
 	return found_objects
 
@@ -45,7 +45,7 @@ def find_objects_as_image(img, objects, threshold = .6, all_ = True):
 		 	cv2.rectangle(img_copy, pt, (pt[0] + w, pt[1] + h), (0,0,255), 2)
 		 	count += 1
 		 	break
-	 	if not all_ and count > 0:
+	 	if ((not all_) and (count > 0)):
 	 		break
 	return Image.fromarray(img_copy)
 
@@ -55,9 +55,13 @@ class GameWindow():
 		self.source_list = ([], [])  #list of all matching windows
 		win32gui.EnumWindows(self.__callback, self.source_list)  #populate list
 		self.source_count = len(self.source_list)
+		self.source = None
 
-	def capture(self, source):
-		hwnd = source
+	def capture(self):
+		if self.source is None:
+			return None
+
+		hwnd = self.source
  		windowSize = win32gui.GetWindowRect(hwnd)
  		hwin = win32gui.GetDesktopWindow()
  		width = windowSize[2] - windowSize[0]
@@ -77,6 +81,18 @@ class GameWindow():
 		srcdc.DeleteDC()
 		win32gui.ReleaseDC(hwnd, hwindc) 
 		return img
+
+	def size(self):
+		if self.source is None:
+			return None
+
+		windowSize = win32gui.GetWindowRect(self.source)
+ 		width = windowSize[2] - windowSize[0]
+		height = windowSize[3] - windowSize[1] 
+		return (width, height)
+
+	def set_source(self, source):
+		self.source = source
 
 	def release(self):
 		pass

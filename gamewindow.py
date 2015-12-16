@@ -3,7 +3,7 @@ import win32gui, win32ui, win32con
 import cv2
 from PIL import Image
 from scipy import where, asarray
-from trakobject import Object
+from gameobject import Object
 
 def find_objects_as_objects(img, objects, threshold = .6, all_ = True): #Multiple objects fix		
 	img_rgb = asarray(img)
@@ -21,14 +21,13 @@ def find_objects_as_objects(img, objects, threshold = .6, all_ = True): #Multipl
 		res = cv2.matchTemplate(img_gray,template,cv2.TM_CCOEFF_NORMED)
 		loc = where( res >= threshold)
 		for pt in zip(*loc[::-1]):
-			name = obj.split('/')[-1]
-			found_objects.add(Object(name, pt, (w,h))) #Can use the first loc value or the avg of them. It is usually accurate
-			break
+			name = obj.split('/')[-1].split('_')[0]
+			found_objects.add(Object(name, pt, (w,h)))
 		if ((not all_) and (len(found_objects) > 1)):
 			break
 	return found_objects
 
-def find_objects_as_image(img, objects, threshold = .6, all_ = True):
+def find_objects_as_image(img, objects, threshold = .6, all_ = True, write_labels = False, labels = None):
 	img_rgb = asarray(img)
 	img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
 	img_copy = img_rgb.copy()
@@ -41,10 +40,13 @@ def find_objects_as_image(img, objects, threshold = .6, all_ = True):
 
 		res = cv2.matchTemplate(img_gray,template,cv2.TM_CCOEFF_NORMED)
 		loc = where( res >= threshold)
+		name = obj.split('/')[-1].split('_')[0]
 		for pt in zip(*loc[::-1]): #pt is the topleft corner
 		 	cv2.rectangle(img_copy, pt, (pt[0] + w, pt[1] + h), (0,0,255), 2)
 		 	count += 1
-		 	break
+		 	if ((write_labels) and (labels is not None) and (name in labels)):
+				cv2.putText(img_copy, name, (pt[0]-5, pt[1]-3), cv2.FONT_HERSHEY_COMPLEX_SMALL, .5, 200)
+	 	
 	 	if ((not all_) and (count > 0)):
 	 		break
 	return Image.fromarray(img_copy)

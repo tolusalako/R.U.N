@@ -7,20 +7,15 @@ from datetime import datetime
 import sys
 from collections import defaultdict
 
-class Tile():
-	def __init__(self, location, above = None, below = None, left = None, right = None):
-		self.location = location
-		self.above = above
-		self.below = below
+class Tile(tuple):
+	def __init__(self, location, top = None, left = None, right = None, topright = None, topleft = None):
+		tuple.__init__(location)
+		self.top = top
 		self.left = left
 		self.right = right
+		self.topleft = topleft
+		self.topright = topright
 		self.score = 0
-
-def get_tile(screen_size, obj_loc, obj_size):
-	width, height = screen_size
-	w,h = obj_size
-	for row in height:
-		for col in width:
 			
 
 class Park():
@@ -30,10 +25,11 @@ class Park():
 		title = name
 		source = 0;
 		self.threshold = .7
-		self.status = defaultdict(list)
+		self.status = defaultdict(str) #key = location, value = object_name
 		self.destroy = False
 		self.char = main_character
-		self.tile_size == (33, 33)
+		self.tile_size = (33, 33)
+		self.current_tree = defaultdict(int) #key = location, value = score
 
 		self.window = gamewindow.GameWindow(self.template_path)
 		for i in range(len(self.window.source_list[0])):
@@ -44,6 +40,15 @@ class Park():
 		self.width, self.height = self.window.size()
 		self.setup()
 
+		# t = self.get_tile((40, 40))
+		# self.current_tree[t] = 1
+		# L = self.generate_tree(t, 'right', 100)
+
+		# while t != None:
+		# 	print t, t.score
+		# 	t = t.right
+
+
 	def setup(self):
 		self.downsize = 1
 		self.generate_tiles()
@@ -51,7 +56,7 @@ class Park():
 		self.master = TK.Tk()
 		self.base = TK.Frame(self.master)
 		#self.master.protocol('WM_DELETE_WINDOW', self.__on_exit_preview)
-		self.master.wm_title("Preview")
+		self.master.wm_title("RunAI")
 		#self.master.iconbitmap('icon.ico')
 		self.canvas = TK.Canvas(master = self.base, background = "#FFFFFF", height = self.height*self.downsize,
 		 width = self.width*self.downsize)
@@ -61,9 +66,11 @@ class Park():
 		self.save_btn.grid(row = 1, columnspan = 20, sticky = TK.W + TK.E)
 
 		self.base.pack()
-		self.preview_loop()
+		#self.preview_loop()
 		#self.hud_preview()
-		#self.update_status()
+		self.update_status()
+		self.tree_preview()
+		#self.print_status()
 		self.master.mainloop()
 
 	def update_status(self):
@@ -71,10 +78,63 @@ class Park():
 		if self.temp_img != None:
 			self.found_objects = gamewindow.find_objects_as_objects(self.temp_img, 
 				[self.template_path + o for o in self.objects], self.threshold)
-			self.status = defaultdict(list) #TODO: Instead of creating new, clear individual keys
+			self.status = defaultdict(str)
 			for o in self.found_objects:
-					self.status[o.name].append(get_tile(o.location))
+				t = self.get_tile(o.location)
+				if t is not None:
+					self.status[t] = o.name
 			self.master.after(1, self.update_status)
+
+	def generate_tree(self, root, direction, steps = 1, score = 1):
+		steps -= 1
+		result = {
+			'right' : self.get_tile_in_direction(root,'right'),
+			'left' : self.get_tile_in_direction(root,'left'),
+			'top' : self.get_tile_in_direction(root,'top'),
+			'down' : self.get_tile_in_direction(root,'down'),
+			'topleft' : self.get_tile_in_direction(root,'topleft'),
+			'topright' : self.get_tile_in_direction(root,'topright')
+		}.get(direction, 'right')
+		if not result is None:
+			if self.current_tree[result] != 0:
+				exec('root.'+direction+'= t')
+				if steps > 0:
+					self.generate_tree(t, direction, steps)
+				return
+
+			exec('root.'+direction+'= result')
+			self.current_tree[result] = score
+			if steps > 0:
+				self.generate_tree(result, direction, steps)
+
+	def get_tile_in_direction(self, start, direction):
+		x,y = start
+		w,h = self.tile_size
+		return{
+			'right' : self.get_tile((x + w, y)),
+			'left' : self.get_tile((x - w, y)),
+			'top' : self.get_tile((x, y - h)),
+			'down' : self.get_tile((x, y + h)),
+			'topleft' : self.get_tile((x - w, y - h)),
+			'topright' : self.get_tile((x + w, y - h))
+		}.get(direction, 'right') #Default
+
+	def get_tile(self, size):
+		w, h = self.tile_size
+		x, y = size
+		result = None
+		try:
+			result = Tile(self.tiles[y/h][x/w]) #New object
+		except(Exception):
+			pass
+		return result
+
+	def print_status(self):
+		status = self.status
+		for s in status.keys():
+			print str(s) + ': ' + status[s]
+		sys.stdout.flush()
+		self.master.after(3000, self.print_status)
 
 	def generate_tiles(self):
 		self.tiles = []
@@ -85,10 +145,6 @@ class Park():
 			for col in range(0, width, w):
 				R.append(Tile((col, row)))
 			self.tiles.append(R)
-
-	def get_tile(x, y):
-		w, h = self.tile_size
-		return self.tile[y/h][x/w]
 
 	def save_temp(self):
 		self.temp_img.save(str(datetime.now().strftime("%I-%M %p")) + '.png')
@@ -123,11 +179,41 @@ class Park():
 				else:
 					color = 'red'
 
-				w,h = o.size
-				start = o.location
+				#w,h = o.size
+				#start = o.location
+				w,h = self.tile_size
+				start = self.get_tile(o.location)
 				end = start[0] + w, start[1]+h
 				self.canvas.create_rectangle(start, end, fill = color)
 			self.master.after(1, self.hud_preview)
+
+	def tree_preview(self):
+		self.current_tree.clear() #clear?
+		self.canvas.delete(TK.ALL)
+		status = self.status.items()
+		print len(status)
+		for k,v in status:
+			if v == 'mario':
+				self.current_tree[k] = -1
+				self.generate_tree(Tile(k), 'left', 1)
+				self.generate_tree(Tile(k), 'topleft', 1)
+				self.generate_tree(Tile(k), 'right', 1)
+				self.generate_tree(Tile(k), 'topright', 1)
+				self.generate_tree(Tile(k), 'top', 1)
+			elif v == 'goomba':
+				self.current_tree[k] = 1
+				self.generate_tree(Tile(k), 'left', 1, -5)
+		w,h = self.tile_size
+
+		for k,v in self.current_tree.items():
+			start = k
+			
+			end = start[0] + w, start[1]+h
+			self.canvas.create_rectangle(start, end, fill = 'black')
+		self.master.after(2, self.tree_preview)
+
+
+		#key = location, value = '' if not generated else 'x' #x 
 
 if __name__ == '__main__':
 	s = len(sys.argv)
@@ -135,4 +221,4 @@ if __name__ == '__main__':
 		print 'Please enter window name.'
 	else:
 		name = sys.argv[1]
-		park = Park(name)
+		park = Park(name, 'mario')

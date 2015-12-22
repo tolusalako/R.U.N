@@ -1,4 +1,4 @@
-from trakobject import Object
+from gameobject import Object
 import gamewindow
 from os import listdir
 import Tkinter as TK
@@ -6,6 +6,17 @@ from PIL import ImageTk, ImageFilter
 from datetime import datetime
 import sys, Queue
 from collections import defaultdict
+import time
+
+controls = {
+	'top' : '0x58',
+	'right': '0x27',
+	'left': '0x25',
+	'topleft':'0x25\n0x58',
+	'topright': '0x27\n0x58'
+}
+
+
 
 class Tile(tuple):
 	def __init__(self, location, top = None, left = None, right = None, topright = None, topleft = None,
@@ -55,6 +66,7 @@ def a_star_search(start):
 	came_from[start] = None
 	cost_so_far[start] = 0
 	found_goal = None
+	path = []
 
 	while not frontier.empty():
 	    current = frontier.get()
@@ -69,9 +81,10 @@ def a_star_search(start):
 	            priority = new_cost + next.score
 	            frontier.put(next, priority)
 	            came_from[next] = current
+	            path.append(current.direction[next])
 
-	return came_from, cost_so_far, found_goal
-
+	#return came_from, cost_so_far, found_goal
+	return path
 
 
 
@@ -90,7 +103,7 @@ class Park():
 		self.tile_size = (33, 33)
 		self.current_tree = defaultdict(int) #key = location, value = Tile
 
-		self.window = gamewindow.GameWindow(self.template_path)
+		self.window = gamewindow.GameWindow(name, self.template_path)
 		for i in range(len(self.window.source_list[0])):
 			if title in self.window.source_list[1][i].lower():
 				source = self.window.source_list[0][i]
@@ -134,6 +147,7 @@ class Park():
 		self.update_status()
 		self.tree_preview()
 		#self.print_status()
+		self.master.withdraw()
 		self.master.mainloop()
 
 	def update_status(self):
@@ -154,27 +168,32 @@ class Park():
 		steps -= 1
 		result = self.get_tile_in_direction(root, direction)
 		if not result is None:
+			took_detour = False
+			detour = None
+			if self.status[result] == 'goomba' or self.status[result] == 'block':
+				detour = self.get_tile_in_direction(result, 'top')
+				if detour is not None:
+					took_detour = True
 			score = cost * abs((result[0]- self.max_x) + (result[1] - self.max_y)) #http://theory.stanford.edu/~amitp/GameProgramming/Heuristics.html#S7
 			if self.current_tree[result] != 0:
 				for t in self.current_tree.keys():
 					if t == result:
-						#t.score, t.cost = score, cost
-						t.score = score
-						exec('root.'+direction+'= t')
-						if steps > 0:
-							self.generate_tree(t, direction, steps, score, cost + 1, set_last_step_to_goal)
-						else:
-							t.is_goal = True if set_last_step_to_goal else False
-						return
+						result = t
+			result.score = score
+			exec('root.'+direction+'= result')
+			self.current_tree[result] = score
+			if steps > 0:
+				self.generate_tree(result, direction, steps, score, cost + 1, set_last_step_to_goal)
+				if took_detour:
+					if direction == 'right' or direction == 'left':
+						exec('root.top'+direction+'= detour')
+						exec('root.'+direction+'= None')
+						exec('detour.'+direction+'= result.'+direction)
+						self.current_tree[result] = 0
+						self.current_tree[detour] = score
+
 			else:
-				#result.score, result.cost = score, cost
-				result.score = score
-				exec('root.'+direction+'= result')
-				self.current_tree[result] = score
-				if steps > 0:
-					self.generate_tree(result, direction, steps, score, cost + 1, set_last_step_to_goal)
-				else:
-					result.is_goal = True if set_last_step_to_goal else False
+				result.is_goal = True if set_last_step_to_goal else False
 		else:
 			root.is_goal = True if set_last_step_to_goal else False
 
@@ -268,33 +287,40 @@ class Park():
 			if v == 'mario':
 				root = k
 				self.current_tree[k] = -1
-				self.generate_tree(k, 'left', 1, cost = 1)
-				self.generate_tree(k, 'topleft', 1, cost = 1)
-				self.generate_tree(k, 'right', self.max_x, cost = 1, set_last_step_to_goal = True)
-				self.generate_tree(k, 'topright', 2, cost = 1)
-				self.generate_tree(k, 'top', 1, cost = 1)
+				# self.generate_tree(k, 'left', 4, cost = 1)
+				# self.generate_tree(k, 'topleft', 4, cost = 1)
+				self.generate_tree(k, 'right', 4, cost = 1, set_last_step_to_goal = True)
+				self.generate_tree(k, 'topright', 3, cost = 1)
+				self.generate_tree(k, 'top', 3, cost = 1)
 
+		if root is not None:
+			result = a_star_search(root)
+			# print result[0]
+			# print
+			# print result[1]
+			# print root
+			# sys.stdout.flush()
+			for direction in result:
+				sequence = controls[direction]
+				for output in sequence.split():
+					self.window.postMessage(int(output, 0))
+					print direction, int(output, 0)
+					sys.stdout.flush()
 
-		result = a_star_search(self.char_location)
-		# print result[0]
-		# print
-		# print result[1]
-		# sys.stdout.flush()
-		#print result[1]
-		previous = result[2]
-		while(previous is not None):
-			w,h = self.tile_size
-			start = previous
-			end = start[0] + w, start[1]+h
+		# previous = result[2]
+		# while(previous is not None):
+		# 	w,h = self.tile_size
+		# 	start = previous
+		# 	end = start[0] + w, start[1]+h
 
-			if previous.is_goal:
-				self.canvas.create_rectangle(start, end, fill = 'green')
-			else:
-				self.canvas.create_rectangle(start, end, fill = 'black')
-			previous = result[0][previous]
+		# 	if previous.is_goal:
+		# 		self.canvas.create_rectangle(start, end, fill = 'green')
+		# 	else:
+		# 		self.canvas.create_rectangle(start, end, fill = 'black')
+		# 	previous = result[0][previous]
 
 		# w,h = self.tile_size
-		#for k,v in self.current_tree.items():
+		# for k,v in self.current_tree.items():
 		# 	start = k
 			
 		# 	end = start[0] + w, start[1]+h

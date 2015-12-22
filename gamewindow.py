@@ -1,9 +1,10 @@
 #Toluwanimi Salako  (www.salakotech.com) 
-import win32gui, win32ui, win32con
+import win32gui, win32ui, win32con, win32api
 import cv2
 from PIL import Image
 from scipy import where, asarray
 from gameobject import Object
+import time
 
 def find_objects_as_objects(img, objects, threshold = .6, all_ = True): #Multiple objects fix		
 	img_rgb = asarray(img)
@@ -52,12 +53,14 @@ def find_objects_as_image(img, objects, threshold = .6, all_ = True, write_label
 	return Image.fromarray(img_copy)
 
 class GameWindow():
-	def __init__(self, template_path):
+	def __init__(self, window_name, template_path):
+		self.window_name = window_name
 		self.templates = template_path
 		self.source_list = ([], [])  #list of all matching windows
 		win32gui.EnumWindows(self.__callback, self.source_list)  #populate list
 		self.source_count = len(self.source_list)
 		self.source = None
+		self.shell = None
 
 	def capture(self):
 		if self.source is None:
@@ -83,6 +86,11 @@ class GameWindow():
 		srcdc.DeleteDC()
 		win32gui.ReleaseDC(hwnd, hwindc) 
 		return img
+
+	def postMessage(self, message, hold = .3):
+		win32api.SendMessage(self.source, win32con.WM_KEYDOWN, message, 1)
+		time.sleep(hold)
+		win32api.SendMessage(self.source, win32con.WM_KEYUP, message, 1)
 
 	def size(self):
 		if self.source is None:

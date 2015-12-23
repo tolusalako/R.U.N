@@ -87,9 +87,13 @@ class GameWindow():
 		win32gui.ReleaseDC(hwnd, hwindc) 
 		return img
 
-	def postMessage(self, message, hold = .3):
+	def pressKey(self, message, hold = -1):
 		win32api.SendMessage(self.source, win32con.WM_KEYDOWN, message, 1)
-		time.sleep(hold)
+		if hold >= 0:
+			time.sleep(hold)
+			win32api.SendMessage(self.source, win32con.WM_KEYUP, message, 1)
+
+	def releaseKey(self, message):
 		win32api.SendMessage(self.source, win32con.WM_KEYUP, message, 1)
 
 	def size(self):

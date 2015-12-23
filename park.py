@@ -35,21 +35,21 @@ class Tile(tuple):
 		self.y = self.__getitem__(1)
 
 	def children(self):
-		result = set()
+		result = []
+		if not self.right is None:
+			result.append(self.right)
+			self.direction[self.right] = 'right'
 		if not self.top is None:
-			result.add(self.top)
+			result.append(self.top)
 			self.direction[self.top] = 'top'
 		if not self.left is None:
-			result.add(self.left)
+			result.append(self.left)
 			self.direction[self.left] = 'left'
-		if not self.right is None:
-			result.add(self.right)
-			self.direction[self.right] = 'right'
 		if not self.topleft is None:
-			result.add(self.topleft)
+			result.append(self.topleft)
 			self.direction[self.topleft] = 'topleft'
 		if not self.topright is None:
-			result.add(self.topright)
+			result.append(self.topright)
 			self.direction[self.topright] = 'topright'
 		return result
 
@@ -112,16 +112,6 @@ class Park():
 		self.width, self.height = self.window.size()
 		self.setup()
 
-		# t = self.get_tile((40, 40))
-		# self.current_tree[t] = 0
-		# L = self.generate_tree(t, 'right', 100)
-
-		# while not t is None:
-		# 	print t, t.cost, t.score
-		# 	t = t.right
-		# print
-		# print self.tiles[-1][-1]
-
 
 	def setup(self):
 		self.downsize = 1
@@ -167,12 +157,16 @@ class Park():
 	def generate_tree(self, root, direction, steps = 1, score = 1, cost = 1, set_last_step_to_goal = False):
 		steps -= 1
 		result = self.get_tile_in_direction(root, direction)
+		max_jump = 4
 		if not result is None:
 			took_detour = False
 			detour = None
 			if self.status[result] == 'goomba' or self.status[result] == 'block':
 				detour = self.get_tile_in_direction(result, 'top')
-				if detour is not None:
+				while self.status[detour] == 'block' and max_jump > 0:
+					if detour == None:
+						pass
+
 					took_detour = True
 			score = cost * abs((result[0]- self.max_x) + (result[1] - self.max_y)) #http://theory.stanford.edu/~amitp/GameProgramming/Heuristics.html#S7
 			if self.current_tree[result] != 0:
@@ -196,6 +190,36 @@ class Park():
 				result.is_goal = True if set_last_step_to_goal else False
 		else:
 			root.is_goal = True if set_last_step_to_goal else False
+
+	def check_forward_for_obstacles(self, root, steps = 4): #returns heighest height of obstacle or longest width of pit
+		x, y = root
+		w, h = self.tile_size
+		heighest = 0
+		pit_length = 0
+		for i in xrange(w,steps*w, w):
+			front = self.get_tile((x+i, y))
+			if front is None: #Out of bounds or No obstacle.
+				pass
+			else:
+				s = self.status[front]
+				if s == 'goomba':
+					heighest = max(heighest, 1)
+				elif s == 'block':
+					height = 1
+					for j in xrange(h,steps*h, h):
+						above = self.get_tile((x+i, y - j))
+						if above is None:
+							break
+						elif self.status[above] == 'block':
+							height += 1
+					heighest = max(heighest, height)
+				elif s == 'pipe':
+					height = 4
+				else: #If front is clear, check below it for pit
+					below = self.get_tile((x+i, y+w))
+					if below is not None and self.status[below] == '': #PIT!
+						pit_length += 1
+		return heighest, pit_length
 
 
 	def get_tile_in_direction(self, start, direction):
@@ -286,49 +310,39 @@ class Park():
 		for k,v in status:
 			if v == 'mario':
 				root = k
-				self.current_tree[k] = -1
-				# self.generate_tree(k, 'left', 4, cost = 1)
-				# self.generate_tree(k, 'topleft', 4, cost = 1)
-				self.generate_tree(k, 'right', 4, cost = 1, set_last_step_to_goal = True)
-				self.generate_tree(k, 'topright', 3, cost = 1)
-				self.generate_tree(k, 'top', 3, cost = 1)
+				break
+
 
 		if root is not None:
-			result = a_star_search(root)
-			# print result[0]
-			# print
-			# print result[1]
-			# print root
-			# sys.stdout.flush()
-			for direction in result:
-				sequence = controls[direction]
-				for output in sequence.split():
-					self.window.postMessage(int(output, 0))
-					print direction, int(output, 0)
-					sys.stdout.flush()
+			result = self.check_forward_for_obstacles(root, steps = 10)
+			m = max(max(result), 2)
+			self.window.pressKey(int(controls['top'], 0), m/2)
+			self.window.pressKey(int(controls['right'], 0))
+			self.window.releaseKey(int(controls['top'], 0))
+			print result
+			sys.stdout.flush()
 
-		# previous = result[2]
-		# while(previous is not None):
-		# 	w,h = self.tile_size
-		# 	start = previous
-		# 	end = start[0] + w, start[1]+h
 
-		# 	if previous.is_goal:
-		# 		self.canvas.create_rectangle(start, end, fill = 'green')
-		# 	else:
-		# 		self.canvas.create_rectangle(start, end, fill = 'black')
-		# 	previous = result[0][previous]
+		# 		self.current_tree[k] = -1
+		# 		#self.generate_tree(k, 'left', 2, cost = 1)
+		# 		# self.generate_tree(k, 'topleft', 4, cost = 1)
+		# 		self.generate_tree(k, 'right', 5, cost = 1, set_last_step_to_goal = True)
+		# 		# self.generate_tree(k, 'topright', 3, cost = 1)
+		# 		# self.generate_tree(k, 'top', 3, cost = 1)
 
-		# w,h = self.tile_size
-		# for k,v in self.current_tree.items():
-		# 	start = k
-			
-		# 	end = start[0] + w, start[1]+h
-		# 	self.canvas.create_text(start, text = str(k.cost)) #Debug view cost and score
-		# 	if k.is_goal:
-		# 		self.canvas.create_rectangle(start, end, fill = 'green')
-		# 	else:
-		# 		self.canvas.create_rectangle(start, end, fill = 'black')
+		# if root is not None:
+		# 	result = a_star_search(root)
+		# 	# print result[0]
+		# 	# print
+		# 	# print result[1]
+		# 	# print root
+		# 	# sys.stdout.flush()
+		# 	for direction in result:
+		# 		sequence = controls[direction]
+		# 		for output in sequence.split():
+		# 			self.window.postMessage(int(output, 0))
+		# 			print direction, int(output, 0)
+		# 			sys.stdout.flush()
 
 
 		self.master.after(1, self.tree_preview)

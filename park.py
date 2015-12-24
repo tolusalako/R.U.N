@@ -303,8 +303,7 @@ class Park():
 			self.master.after(1, self.hud_preview)
 
 	def tree_preview(self):
-		self.current_tree.clear() #clear?
-		self.canvas.delete(TK.ALL)
+		self.current_tree.clear() #clear
 		status = self.status.items()
 		root = None
 		for k,v in status:
@@ -314,14 +313,19 @@ class Park():
 
 
 		if root is not None:
-			result = self.check_forward_for_obstacles(root, steps = 10)
-			m = max(max(result), 2)
-			self.window.pressKey(int(controls['top'], 0), m/2)
-			self.window.pressKey(int(controls['right'], 0))
-			self.window.releaseKey(int(controls['top'], 0))
-			print result
+			obstacle, pit = self.check_forward_for_obstacles(root, steps = 3)
+			KEY_PRESS = 0.3
+			KEY_PRESS_SMALL = 0.1
+			if pit == obstacle == 0:
+				self.window.pressKey(int(controls['right'], 0), KEY_PRESS)
+			elif 0 < pit < 3:
+				self.window.pressKey(int(controls['right'], 0), (pit*KEY_PRESS)/ 2)
+				self.window.pressKey(int(controls['top'], 0), pit*KEY_PRESS_SMALL)
+			else:
+				self.window.pressKey(int(controls['top'], 0), obstacle*KEY_PRESS)
+				self.window.pressKey(int(controls['right'], 0), KEY_PRESS)
+			print obstacle, pit
 			sys.stdout.flush()
-
 
 		# 		self.current_tree[k] = -1
 		# 		#self.generate_tree(k, 'left', 2, cost = 1)

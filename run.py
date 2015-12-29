@@ -193,4 +193,4 @@ if __name__ == '__main__':
 		print 'Please enter window name.'
 	else:
 		name = sys.argv[1]
-		park = RunAI(name, 'mario')
+		r = RunAI(name, 'mario')

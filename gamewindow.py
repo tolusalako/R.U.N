@@ -6,7 +6,7 @@ from scipy import where, asarray
 from gameobject import Object
 import time
 
-def find_objects_as_objects(img, objects, threshold = .6, all_ = True): #Multiple objects fix		
+def find_objects_as_objects(img, objects, threshold = .6, all_ = True):		
 	img_rgb = asarray(img)
 	img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
 
